@@ -20,17 +20,20 @@ def your_hf_token():
 def your_prompt():
     """Returns a prompt to add to "[PREFIX]a+b[SUFFIX]", where a,b are integers
     Returns:
-        A string.
+        A String.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # 彻底删掉所有带空格的指令，回归最原始的 Q&A 模式
     prefix = (
-        "Q: 1111111 + 2222222\nA: 3333333\n\n"
-        "Q: 7654321 + 1234567\nA: 8888888\n\n"
-        "Q: 9876543 + 1234567\nA: 11111110\n\n"
+        "Instructions: Add two 7-digit numbers by adding digits position by position from right to left.\n\n"
+        "Q: 1357924 + 2468135\n"
+        "Thinking: 4+5=9, 2+3=5, 9+1=10 (carry 1), 7+8+1=16 (carry 1), 5+6+1=12 (carry 1), 3+4+1=8, 1+2=3.\n"
+        "A: 3826059\n\n"
+        "Q: 9876543 + 1010101\n"
+        "Thinking: 3+1=4, 4+0=4, 5+1=6, 6+0=6, 7+1=8, 8+0=8, 9+1=10.\n"
+        "A: 10886644\n\n"
         "Q: "
     )
-    suffix = "\nA:"
+    suffix = "\nThinking: "
 
     return prefix, suffix
 
@@ -45,13 +48,13 @@ def your_config():
         Adding additional keys will result in error.
     """
     config = {
-        'max_tokens': 20,
+        'max_tokens': 150,
         'temperature': 0.1,
         'top_k': 1,
         'top_p': 1.0,
-        'repetition_penalty': 1.2,
-        'stop': ["\n", "Q:"]}
-    
+        'repetition_penalty': 1.1,
+        'stop': ['Q:']}
+
     return config
 
 
@@ -61,25 +64,18 @@ def your_pre_processing(s):
 
 
 def your_post_processing(output_string):
-    """Returns the post processing function to extract the answer for addition
-    Returns:
-        For: the function returns extracted result
-    Note:
-        do not attempt to "hack" the post processing function
-        by extracting the two given numbers and adding them.
-        the autograder will check whether the post processing function contains arithmetic additiona and the graders might also manually check.
-    """
-    # 1. 删掉所有空格和逗号，防止模型输出 1,234,567 或 1 2 3...
-    cleaned = re.sub(r"\s+", "", output_string).replace(",", "").strip()
+    # 1. 寻找字符串中最后一个 A: 之后的内容
+    if 'A:' in output_string:
+        output_string = output_string.split('A:')[-1]
 
-    # 2. 在清理后的字符串里，找第一个出现的 7 到 9 位数字（加法结果的合理长度）
-    m_long = re.search(r"(\d{7,9})", cleaned)
-    if m_long:
-        return int(m_long.group(1))
+    # 2. 清理掉所有非数字符号（保留负号以防万一）
+    cleaned = re.sub(r'[^0-9\-]', '', output_string).strip()
 
-    # 3. 如果没找到长数字，就抓第一个看到的数字序列
-    m_any = re.search(r"\d+", cleaned)
-    if m_any:
-        return int(m_any.group(0))
+    # 3. 抓取第一个出现的长数字串
+    match = re.search(r'(\d{7,9})', cleaned)
+    if match:
+        return int(match.group(1))
 
-    return 0
+    # 4. 兜底逻辑：抓取任何数字
+    all_nums = re.findall(r'\d+', cleaned)
+    return int(all_nums[0]) if all_nums else 0
