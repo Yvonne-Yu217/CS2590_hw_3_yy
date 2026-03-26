@@ -23,9 +23,9 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Single exemplar is less likely to anchor the model to a constant wrong value.
-    prefix = "Question: what is 1234567+1234567?\nAnswer: 2469134\nQuestion: what is "
-    suffix = "?\nAnswer:"
+    # Keep prompt compact to reduce length penalty in the grader score.
+    prefix = "Q:1234567+1234567\nA:2469134\nQ:"
+    suffix = "\nA:"
 
     return prefix, suffix
 
@@ -41,10 +41,10 @@ def your_config():
     """
     config = {
         'max_tokens': 50,
-        'temperature': 1.0,
-        'top_k': 50,
-        'top_p': 1.0,
-        'repetition_penalty': 1.0,
+        'temperature': 0.3,
+        'top_k': 40,
+        'top_p': 0.95,
+        'repetition_penalty': 1.05,
         'stop': []}
     
     return config
