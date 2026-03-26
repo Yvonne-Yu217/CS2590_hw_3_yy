@@ -23,9 +23,9 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Mixed-scale exemplars improve both small/medium and 7-digit additions.
-    prefix = "Only digits.\nQ:47+58\nA:105\nQ:1234567+1234567\nA:2469134\nQ:"
-    suffix = "\nA:"
+    # Single exemplar is less likely to anchor the model to a constant wrong value.
+    prefix = "Question: what is 1234567+1234567?\nAnswer: 2469134\nQuestion: what is "
+    suffix = "?\nAnswer:"
 
     return prefix, suffix
 
@@ -41,9 +41,9 @@ def your_config():
     """
     config = {
         'max_tokens': 50,
-        'temperature': 0.2,
-        'top_k': 20,
-        'top_p': 0.9,
+        'temperature': 1.0,
+        'top_k': 50,
+        'top_p': 1.0,
         'repetition_penalty': 1.0,
         'stop': []}
     
@@ -94,11 +94,19 @@ def your_post_processing(output_string):
             except:
                 pass
 
-    # Fallback: first integer anywhere.
-    m_any = re.search(r"[-+]?\d+", cleaned)
-    if m_any:
+    # Prefer the last number on first line (often in form "a+b=answer").
+    first_line_nums = re.findall(r"[-+]?\d+", first_line)
+    if first_line_nums:
         try:
-            return int(m_any.group(0))
+            return int(first_line_nums[-1])
+        except:
+            pass
+
+    # Fallback: last integer anywhere in output.
+    all_any = re.findall(r"[-+]?\d+", cleaned)
+    if all_any:
+        try:
+            return int(all_any[-1])
         except:
             pass
 
