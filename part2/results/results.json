@@ -1,0 +1,15 @@
+{
+  "date": "2026-03-25T18:20:25.706267",
+  "num_tests": 1,
+  "failures": 0,
+  "errors": 1,
+  "skipped": 0,
+  "successful": false,
+  "details": [
+    {
+      "name": "test_grader (unittest.loader._FailedTest.test_grader)",
+      "status": "failed",
+      "message": "ImportError: Failed to import test module: test_grader\nTraceback (most recent call last):\n  File \"/opt/anaconda3/lib/python3.13/unittest/loader.py\", line 137, in loadTestsFromName\n    module = __import__(module_name)\nModuleNotFoundError: No module named 'tests.test_grader'\n\n"
+    }
+  ]
+}

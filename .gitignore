@@ -1,0 +1,8 @@
+llama/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+*.pth
+*.safetensors
+*.bin
+*.model
