@@ -23,10 +23,10 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Use in-distribution 7-digit demonstrations for better arithmetic behavior.
+    # Use spaced 7-digit demonstrations to improve per-digit alignment.
     prefix = (
-        "Q:1234567+1234567\nA:2469134\n"
-        "Q:1010101+1010101\nA:2020202\n"
+        "Q: 1 2 3 4 5 6 7 + 1 2 3 4 5 6 7\nA: 2 4 6 9 1 3 4\n"
+        "Q: 1 0 1 0 1 0 1 + 1 0 1 0 1 0 1\nA: 2 0 2 0 2 0 2\n"
         "Q:"
     )
     suffix = "\nA:"
@@ -55,7 +55,8 @@ def your_config():
 
 
 def your_pre_processing(s):
-    return s.strip()
+    # Convert "1234567+7654321" -> "1 2 3 4 5 6 7 + 7 6 5 4 3 2 1"
+    return " ".join(list(s.replace(" ", "")))
 
     
 def your_post_processing(output_string):
@@ -67,7 +68,7 @@ def your_post_processing(output_string):
         by extracting the two given numbers and adding them.
         the autograder will check whether the post processing function contains arithmetic additiona and the graders might also manually check.
     """
-    cleaned = output_string.strip().replace(",", "")
+    cleaned = output_string.replace(" ", "").replace(",", "").strip()
     lines = cleaned.splitlines()
 
     if not lines:
@@ -91,15 +92,25 @@ def your_post_processing(output_string):
         except:
             pass
 
-    # Tier 3: Fallback to first integer on first line.
+    # Tier 3: If equation appears, prefer RHS number.
+    if "=" in first_line:
+        rhs = first_line.split("=")[-1]
+        m_rhs = re.search(r"[-+]?\d+", rhs)
+        if m_rhs:
+            try:
+                return int(m_rhs.group(0))
+            except:
+                pass
+
+    # Tier 4: Fallback to last integer on first line.
     first_line_nums = re.findall(r"[-+]?\d+", first_line)
     if first_line_nums:
         try:
-            return int(first_line_nums[0])
+            return int(first_line_nums[-1])
         except:
             pass
 
-    # Tier 4: Prefer explicit labels anywhere in output.
+    # Tier 5: Prefer explicit labels anywhere in output.
     labeled_anywhere = re.findall(r"(?:A|Answer)\s*[:=]\s*([-+]?\d+)", cleaned, flags=re.IGNORECASE)
     if labeled_anywhere:
         try:
@@ -107,7 +118,7 @@ def your_post_processing(output_string):
         except:
             pass
 
-    # Tier 5: Conservative fallback to first integer anywhere.
+    # Tier 6: Conservative fallback to first integer anywhere.
     all_any = re.findall(r"[-+]?\d+", cleaned)
     if all_any:
         try:
