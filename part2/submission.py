@@ -23,14 +23,9 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Use Llama-2-chat native instruction format for better adherence.
-    prefix = (
-        "<s>[INST] You are a reliable arithmetic assistant. "
-        "Add the two integers exactly and return only the final sum as digits. "
-        "Example: 123+456 -> 579. "
-        "Now solve: "
-    )
-    suffix = " [/INST]"
+    # Keep prompt extremely short: score penalizes prompt length heavily.
+    prefix = ""
+    suffix = "="
 
     return prefix, suffix
 
@@ -46,10 +41,10 @@ def your_config():
     """
     config = {
         'max_tokens': 50,
-        'temperature': 1.0,
-        'top_k': 50,
+        'temperature': 0.1,
+        'top_k': 20,
         'top_p': 1.0,
-        'repetition_penalty': 1.05,
+        'repetition_penalty': 1.1,
         'stop': []}
     
     return config
@@ -83,19 +78,22 @@ def your_post_processing(output_string):
             except:
                 pass
 
-    # Many model outputs contain "a+b=answer"; last number is usually the answer.
+    # Many outputs contain input echo and answer; for positive addition,
+    # the final sum is typically the largest integer in that line.
     all_first_line = re.findall(r"[-+]?\d+", first_line)
     if all_first_line:
         try:
-            return int(all_first_line[-1])
+            nums = [int(x) for x in all_first_line]
+            return max(nums)
         except:
             pass
 
-    # Last fallback: last number anywhere in output.
+    # Last fallback: largest number anywhere in output.
     all_any = re.findall(r"[-+]?\d+", cleaned)
     if all_any:
         try:
-            return int(all_any[-1])
+            nums_any = [int(x) for x in all_any]
+            return max(nums_any)
         except:
             pass
 
