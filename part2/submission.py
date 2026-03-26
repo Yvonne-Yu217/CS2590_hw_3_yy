@@ -23,23 +23,18 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Keep examples diverse and format-consistent to reduce answer-copy bias.
+    # Randomized examples reduce copying one fixed target answer.
     prefix = (
-        "Add the digits precisely from right to left. Use spaces between digits.\n\n"
-        "Q: 1 2 3 4 5 6 7 + 1 2 3 4 5 6 7\n"
-        "A: 2 4 6 9 1 3 4\n"
-        "\n"
+        "Instructions: Add the digits carefully. Use spaces between digits in your output.\n\n"
+        "Q: 1 3 5 7 9 2 4 + 2 4 6 8 1 3 5\n"
+        "A: 3 8 2 6 0 5 9\n\n"
         "Q: 4 0 1 0 5 0 2 + 1 9 2 8 3 7 4\n"
-        "A: 5 9 3 8 8 7 6\n"
-        "\n"
-        "Q: 9 8 7 6 5 4 3 + 1 2 3 4 5 6 7\n"
-        "A: 1 1 1 1 1 1 1 0\n"
-        "\n"
-        "Q: 2 4 6 8 0 1 3 + 3 5 7 9 1 2 4\n"
-        "A: 6 0 4 7 1 3 7\n\n"
+        "A: 5 9 3 8 8 7 6\n\n"
+        "Q: 8 1 7 2 6 3 5 + 1 0 2 9 3 8 4\n"
+        "A: 9 2 0 2 0 1 9\n\n"
         "Q: "
     )
-    suffix = "\nA: "
+    suffix = "\nA:"
 
     return prefix, suffix
 
@@ -87,24 +82,24 @@ def your_post_processing(output_string):
         by extracting the two given numbers and adding them.
         the autograder will check whether the post processing function contains arithmetic additiona and the graders might also manually check.
     """
-    # Remove all whitespace/newlines first so split formatting cannot break numbers.
+    # Remove all whitespace/newlines first so multi-line digits become one number string.
     cleaned = re.sub(r"\s+", "", output_string).replace(",", "").strip()
     if not cleaned:
         return 0
 
-    # Prefer a 7-8 digit sequence (expected output length for 7-digit addition tasks).
-    m_long = re.search(r"(\d{7,8})", cleaned)
+    # Prefer the first plausible long sum token.
+    m_long = re.search(r"(\d{7,9})", cleaned)
     if m_long:
         try:
             return int(m_long.group(1))
         except:
             pass
 
-    # Final fallback: first available number token.
-    all_nums = re.findall(r"\d+", cleaned)
-    if all_nums:
+    # Final fallback: first number in cleaned output.
+    m_any = re.search(r"\d+", cleaned)
+    if m_any:
         try:
-            return int(all_nums[0])
+            return int(m_any.group(0))
         except:
             pass
 
