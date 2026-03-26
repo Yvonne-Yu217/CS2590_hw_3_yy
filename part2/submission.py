@@ -23,21 +23,23 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Provide diverse carry/no-carry examples while keeping outputs numeric.
+    # Keep examples diverse and format-consistent to reduce answer-copy bias.
     prefix = (
-        "Calculate the sum precisely. Align digits and add from right to left.\n\n"
+        "Add the digits precisely from right to left. Use spaces between digits.\n\n"
         "Q: 1 2 3 4 5 6 7 + 1 2 3 4 5 6 7\n"
         "A: 2 4 6 9 1 3 4\n"
-        "Answer: 2469134\n\n"
+        "\n"
+        "Q: 4 0 1 0 5 0 2 + 1 9 2 8 3 7 4\n"
+        "A: 5 9 3 8 8 7 6\n"
+        "\n"
         "Q: 9 8 7 6 5 4 3 + 1 2 3 4 5 6 7\n"
         "A: 1 1 1 1 1 1 1 0\n"
-        "Answer: 11111110\n\n"
-        "Q: 5 0 5 0 5 0 5 + 4 0 4 0 4 0 4\n"
-        "A: 9 0 9 0 9 0 9\n"
-        "Answer: 9090909\n\n"
-        "Q:"
+        "\n"
+        "Q: 2 4 6 8 0 1 3 + 3 5 7 9 1 2 4\n"
+        "A: 6 0 4 7 1 3 7\n\n"
+        "Q: "
     )
-    suffix = "\nA:"
+    suffix = "\nA: "
 
     return prefix, suffix
 
@@ -57,7 +59,7 @@ def your_config():
         'top_k': 1,
         'top_p': 1.0,
         'repetition_penalty': 1.1,
-        'stop': []}
+        'stop': ["\n", "Q:"]}
     
     return config
 
@@ -90,27 +92,19 @@ def your_post_processing(output_string):
     if not cleaned:
         return 0
 
-    # Prefer explicit trailing labels near the answer region.
-    labeled_anywhere = re.findall(r"(?:A|Answer)[:=]([-+]?\d+)", cleaned, flags=re.IGNORECASE)
-    if labeled_anywhere:
+    # Prefer a 7-8 digit sequence (expected output length for 7-digit addition tasks).
+    m_long = re.search(r"(\d{7,8})", cleaned)
+    if m_long:
         try:
-            return int(labeled_anywhere[-1])
+            return int(m_long.group(1))
         except:
             pass
 
-    # Prefer 7-8 digit candidates (expected range for 7-digit addition results).
-    long_nums = re.findall(r"\d{7,8}", cleaned)
-    if long_nums:
+    # Final fallback: first available number token.
+    all_nums = re.findall(r"\d+", cleaned)
+    if all_nums:
         try:
-            return int(long_nums[-1])
-        except:
-            pass
-
-    # Final fallback: any numeric token.
-    all_any = re.findall(r"\d+", cleaned)
-    if all_any:
-        try:
-            return int(all_any[-1])
+            return int(all_nums[0])
         except:
             pass
 
