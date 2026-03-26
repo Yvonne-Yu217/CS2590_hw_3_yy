@@ -19,64 +19,46 @@ def your_hf_token():
 # for adding small numbers (1-6 digits) and large numbers (7 digits), write prompt prefix and prompt suffix separately.
 def your_prompt():
     prefix = (
-        "Complete the addition using vertical alignment.\n\n"
-        "Q: 1357924 + 2468135\n"
-        "  1 3 5 7 9 2 4\n"
-        "+ 2 4 6 8 1 3 5\n"
-        "---------------\n"
-        "A: 3826059\n\n"
-        "Q: 8172635 + 1029384\n"
-        "  8 1 7 2 6 3 5\n"
-        "+ 1 0 2 9 3 8 4\n"
-        "---------------\n"
-        "A: 9202019\n\n"
-        "Q: 9999999 + 1010101\n"
-        "  9 9 9 9 9 9 9\n"
-        "+ 1 0 1 0 1 0 1\n"
-        "---------------\n"
-        "A: 11010100\n\n"
+        "You are a precise math calculator. Add the digits correctly using spaces.\n\n"
+        "Q: 1 4 2 5 3 6 7 + 2 3 5 1 4 2 1\nA: 3 7 7 6 7 8 8\n\n"
+        "Q: 8 5 9 4 3 0 2 + 1 2 0 5 6 9 7\nA: 9 7 9 9 9 9 9\n\n"
+        "Q: 6 0 4 7 1 3 7 + 3 5 7 9 1 2 4\nA: 9 6 2 6 2 6 1\n\n"
+        "Q: 5 8 2 0 4 9 1 + 2 1 7 9 5 0 8\nA: 7 9 9 9 9 9 9\n\n"
         "Q: "
     )
-    suffix = "\n"
+    suffix = "\nA: "
     return prefix, suffix
 
 
 def your_config():
     config = {
-        'max_tokens': 100,
-        'temperature': 0.01,
+        'max_tokens': 60,
+        'temperature': 0.1,
         'top_k': 1,
         'top_p': 1.0,
         'repetition_penalty': 1.1,
-        'stop': ['Q:', '\n\n']
+        'stop': ['\n', 'Q:']
     }
     return config
 
 
 def your_pre_processing(s):
-    # 将 "1234567+1010101" 转换为竖式形式，利于模型对齐
-    nums = re.findall(r"\d+", s)
-    if len(nums) == 2:
-        return f"{' '.join(list(nums[0]))}\n+ {' '.join(list(nums[1]))}\n---------------"
-    return s.strip()
+    # 将 "1234567+1234567" 变成 "1 2 3 4 5 6 7 + 1 2 3 4 5 6 7"
+    return " ".join(list(s.replace(" ", "")))
 
 
 def your_post_processing(output_string):
-    # 1. 寻找 A: 标记后的内容
-    if 'A:' in output_string:
-        output_string = output_string.split('A:')[-1]
-
-    # 2. 删掉所有空格和非数字字符
-    cleaned = re.sub(r"[^0-9]", "", output_string).strip()
+    # 1. 彻底清除所有空白字符（解决多行输出和空格输出的问题）
+    cleaned = re.sub(r"\s+", "", output_string).replace(",", "").strip()
 
     if not cleaned:
         return 0
 
-    # 3. 抓取第一个出现的 7 到 9 位长数字（加法结果的合规范围）
+    # 2. 优先找 7 到 9 位的长数字（这才是真正的加法结果）
     match = re.search(r"(\d{7,9})", cleaned)
     if match:
         return int(match.group(1))
 
-    # 4. 兜底：抓取任何数字
+    # 3. 兜底：抓取第一个数字块
     all_nums = re.findall(r"\d+", cleaned)
     return int(all_nums[0]) if all_nums else 0
