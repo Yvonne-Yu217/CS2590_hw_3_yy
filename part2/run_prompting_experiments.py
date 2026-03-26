@@ -41,8 +41,17 @@ def load_model(model_id: str, device: str):
     tokenizer = AutoTokenizer.from_pretrained(model_id)
 
     print(f"Loading model: {model_id}")
-    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float32)
-    model = model.to(device)
+    # Prefer reduced precision on GPU to avoid OOM on 7B/8B models.
+    model_kwargs = {"low_cpu_mem_usage": True}
+    if device == "cuda":
+        model_kwargs["torch_dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        model_kwargs["device_map"] = "auto"
+    else:
+        model_kwargs["torch_dtype"] = torch.float32
+
+    model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
+    if device != "cuda":
+        model = model.to(device)
     model.eval()
 
     return model, tokenizer
@@ -485,55 +494,61 @@ def main():
 
     # Q3c and notebook Q4d(max_tokens=20) style experiment on Qwen
     if not args.skip_qwen:
-        model_2, tokenizer_2 = load_model(args.qwen_model, device)
+        try:
+            model_2, tokenizer_2 = load_model(args.qwen_model, device)
 
-        prompt_config_qwen8 = {
-            "max_tokens": 8,
-            "temperature": 0.7,
-            "top_k": 50,
-            "top_p": 0.6,
-            "repetition_penalty": 1,
-            "stop": [],
-        }
-        run_experiment_and_record(
-            results,
-            out_dir,
-            "q3c_qwen_7digit_max8",
-            model_2,
-            tokenizer_2,
-            args.qwen_model,
-            added_prompt,
-            prompt_config_qwen8.copy(),
-            rng,
-            device,
-            args.n_sample,
-            1000000,
-            9999999,
-            postproc_digits_anywhere,
-            debug=args.debug,
-        )
+            prompt_config_qwen8 = {
+                "max_tokens": 8,
+                "temperature": 0.7,
+                "top_k": 50,
+                "top_p": 0.6,
+                "repetition_penalty": 1,
+                "stop": [],
+            }
+            run_experiment_and_record(
+                results,
+                out_dir,
+                "q3c_qwen_7digit_max8",
+                model_2,
+                tokenizer_2,
+                args.qwen_model,
+                added_prompt,
+                prompt_config_qwen8.copy(),
+                rng,
+                device,
+                args.n_sample,
+                1000000,
+                9999999,
+                postproc_digits_anywhere,
+                debug=args.debug,
+            )
 
-        prompt_config_qwen20 = prompt_config_qwen8.copy()
-        prompt_config_qwen20["max_tokens"] = 20
-        run_experiment_and_record(
-            results,
-            out_dir,
-            "q3d_qwen_7digit_max20",
-            model_2,
-            tokenizer_2,
-            args.qwen_model,
-            added_prompt,
-            prompt_config_qwen20.copy(),
-            rng,
-            device,
-            args.n_sample,
-            1000000,
-            9999999,
-            postproc_digits_anywhere,
-            debug=args.debug,
-        )
+            prompt_config_qwen20 = prompt_config_qwen8.copy()
+            prompt_config_qwen20["max_tokens"] = 20
+            run_experiment_and_record(
+                results,
+                out_dir,
+                "q3d_qwen_7digit_max20",
+                model_2,
+                tokenizer_2,
+                args.qwen_model,
+                added_prompt,
+                prompt_config_qwen20.copy(),
+                rng,
+                device,
+                args.n_sample,
+                1000000,
+                9999999,
+                postproc_digits_anywhere,
+                debug=args.debug,
+            )
 
-        unload_model(model_2, tokenizer_2)
+            unload_model(model_2, tokenizer_2)
+        except torch.OutOfMemoryError:
+            print("Warning: OOM while running Qwen experiments. Skipping Qwen section.")
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     json_path = out_dir / "results.json"
     json_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
