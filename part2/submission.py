@@ -23,7 +23,14 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    prefix = "Add the two integers. Return only the final sum as digits.\nQ: "
+    prefix = (
+        "Add the two integers.\n"
+        "Q: 147+253\n"
+        "A: 400\n\n"
+        "Q: 5891+4208\n"
+        "A: 10099\n\n"
+        "Q: "
+    )
 
     suffix = "\nA:"
 
@@ -40,12 +47,12 @@ def your_config():
         Adding additional keys will result in error.
     """
     config = {
-        'max_tokens': 50, # max_tokens must be >= 50 because we don't always have prior on output length 
-        'temperature': 1.0,
+        'max_tokens': 100, 
+        'temperature': 0.1,
         'top_k': 50,
         'top_p': 1.0,
         'repetition_penalty': 1.0,
-        'stop': []}
+        'stop': ['\n']}
     
     return config
 
@@ -63,12 +70,11 @@ def your_post_processing(output_string):
         by extracting the two given numbers and adding them.
         the autograder will check whether the post processing function contains arithmetic additiona and the graders might also manually check.
     """
-    # Parse the first integer produced by the model continuation.
     cleaned = output_string.strip().replace(",", "")
-    match = re.search(r"[-+]?\d+", cleaned)
-    only_digits = match.group(0) if match else ""
+    matches = re.findall(r"[-+]?\d+", cleaned)
+    if not matches:
+        return 0
     try:
-        res = int(only_digits)
+        return int(matches[-1])
     except:
-        res = 0
-    return res
+        return 0
