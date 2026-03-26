@@ -23,16 +23,9 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    prefix = (
-        "Add the two integers.\n"
-        "Q: 147+253\n"
-        "A: 400\n\n"
-        "Q: 5891+4208\n"
-        "A: 10099\n\n"
-        "Q: "
-    )
-
-    suffix = "\nA:"
+    # Keep the prompt short (grading rewards brevity) and direct.
+    prefix = "Compute exact sum: "
+    suffix = " ="
 
     return prefix, suffix
 
@@ -47,12 +40,12 @@ def your_config():
         Adding additional keys will result in error.
     """
     config = {
-        'max_tokens': 100, 
-        'temperature': 0.1,
+        'max_tokens': 50,
+        'temperature': 1.0,
         'top_k': 50,
         'top_p': 1.0,
-        'repetition_penalty': 1.0,
-        'stop': ['\n']}
+        'repetition_penalty': 1.05,
+        'stop': []}
     
     return config
 
@@ -71,10 +64,34 @@ def your_post_processing(output_string):
         the autograder will check whether the post processing function contains arithmetic additiona and the graders might also manually check.
     """
     cleaned = output_string.strip().replace(",", "")
-    matches = re.findall(r"[-+]?\d+", cleaned)
-    if not matches:
-        return 0
-    try:
-        return int(matches[-1])
-    except:
-        return 0
+
+    # Prefer the first generated line to avoid later drift/hallucinated continuations.
+    first_line = cleaned.splitlines()[0] if cleaned else ""
+
+    # If model emits "... = 123", prefer the number after '='.
+    if "=" in first_line:
+        rhs = first_line.split("=")[-1]
+        m_rhs = re.search(r"[-+]?\d+", rhs)
+        if m_rhs:
+            try:
+                return int(m_rhs.group(0))
+            except:
+                pass
+
+    # Fallback: first number from first line.
+    m_first = re.search(r"[-+]?\d+", first_line)
+    if m_first:
+        try:
+            return int(m_first.group(0))
+        except:
+            pass
+
+    # Last fallback: first number anywhere in output.
+    m_any = re.search(r"[-+]?\d+", cleaned)
+    if m_any:
+        try:
+            return int(m_any.group(0))
+        except:
+            pass
+
+    return 0
