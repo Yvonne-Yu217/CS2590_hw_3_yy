@@ -23,9 +23,9 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Keep prompt extremely short: score penalizes prompt length heavily.
-    prefix = ""
-    suffix = "="
+    # Follow the homework's suggested QA format with one anchor example.
+    prefix = "Question: what is 1234567+1234567?\nAnswer: 2469134\nQuestion: what is "
+    suffix = "?\nAnswer:"
 
     return prefix, suffix
 
@@ -41,10 +41,10 @@ def your_config():
     """
     config = {
         'max_tokens': 50,
-        'temperature': 0.1,
-        'top_k': 20,
+        'temperature': 1.0,
+        'top_k': 50,
         'top_p': 1.0,
-        'repetition_penalty': 1.1,
+        'repetition_penalty': 1.0,
         'stop': []}
     
     return config
@@ -65,35 +65,22 @@ def your_post_processing(output_string):
     """
     cleaned = output_string.strip().replace(",", "")
 
-    # Prefer the first generated line, but keep fallback on full text.
+    # First line usually contains the answer in this QA format.
     first_line = cleaned.splitlines()[0] if cleaned else ""
 
-    # If model emits "... = 123", prefer the number after '='.
-    if "=" in first_line:
-        rhs = first_line.split("=")[-1]
-        m_rhs = re.search(r"[-+]?\d+", rhs)
-        if m_rhs:
-            try:
-                return int(m_rhs.group(0))
-            except:
-                pass
-
-    # Many outputs contain input echo and answer; for positive addition,
-    # the final sum is typically the largest integer in that line.
-    all_first_line = re.findall(r"[-+]?\d+", first_line)
-    if all_first_line:
+    # Prefer first integer in the first line (e.g., "10249936" or "The answer is 10249936").
+    m_first = re.search(r"[-+]?\d+", first_line)
+    if m_first:
         try:
-            nums = [int(x) for x in all_first_line]
-            return max(nums)
+            return int(m_first.group(0))
         except:
             pass
 
-    # Last fallback: largest number anywhere in output.
-    all_any = re.findall(r"[-+]?\d+", cleaned)
-    if all_any:
+    # Fallback to first integer anywhere in output.
+    m_any = re.search(r"[-+]?\d+", cleaned)
+    if m_any:
         try:
-            nums_any = [int(x) for x in all_any]
-            return max(nums_any)
+            return int(m_any.group(0))
         except:
             pass
 
