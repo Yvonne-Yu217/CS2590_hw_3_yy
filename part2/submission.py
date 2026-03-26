@@ -23,8 +23,8 @@ def your_prompt():
         A string.
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
-    # Short QA format plus one carry-heavy exemplar for 7-digit sums.
-    prefix = "Only digits.\nQ:3044419+6608684\nA:9653103\nQ:"
+    # Mixed-scale exemplars improve both small/medium and 7-digit additions.
+    prefix = "Only digits.\nQ:47+58\nA:105\nQ:1234567+1234567\nA:2469134\nQ:"
     suffix = "\nA:"
 
     return prefix, suffix
@@ -41,9 +41,9 @@ def your_config():
     """
     config = {
         'max_tokens': 50,
-        'temperature': 1.0,
-        'top_k': 50,
-        'top_p': 1.0,
+        'temperature': 0.2,
+        'top_k': 20,
+        'top_p': 0.9,
         'repetition_penalty': 1.0,
         'stop': []}
     
