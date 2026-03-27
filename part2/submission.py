@@ -52,6 +52,7 @@ def your_config():
     return {
         'max_tokens': 350,
         'temperature': 0.0,
+        'do_sample': False,
         'top_k': 1,
         'top_p': 1.0,
         'repetition_penalty': 1.0,
