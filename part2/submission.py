@@ -34,12 +34,9 @@ def your_prompt():
         "Answer: 10968828\n"
         "Sample Question 5: What is 4398254 + 2309481?\n"
         "Answer: 4629102\n"
-        "Question: What is a+b?\n"
+        "Question: What is "
     )
-    suffix = ""
-    return prefix, suffix
-    suffix = "\nA:"
-
+    suffix = "? Answer:"
     return prefix, suffix
 
 
@@ -64,17 +61,8 @@ def your_config():
 
 
 def your_pre_processing(s):
-    # Convert "1234567+7654321" into spaced form so tokenizer sees per-digit units.
-    cleaned = s.strip().replace(" ", "")
-    spaced = []
-    for ch in cleaned:
-        if ch.isdigit() or ch in "+-":
-            spaced.append(ch)
-        else:
-            spaced.append(ch)
-    # Add spaces between digits but keep + and - as separators.
-    spaced = " ".join(spaced).replace(" + ", " + ").replace(" - ", " - ")
-    return spaced
+    # Keep arithmetic expression compact to match the prompt format: a+b
+    return s.strip().replace(" ", "")
 
 
 def your_post_processing(output_string):
@@ -86,29 +74,46 @@ def your_post_processing(output_string):
         by extracting the two given numbers and adding them.
         the autograder will check whether the post processing function contains arithmetic additiona and the graders might also manually check.
     """
-    # Remove all whitespace/newlines first so split formatting cannot break numbers.
-    cleaned = re.sub(r"\s+", "", output_string).replace(",", "").strip()
+    cleaned = output_string.replace(",", "").strip()
     if not cleaned:
         return 0
 
-    # Prefer explicit trailing labels near the answer region.
-    labeled_anywhere = re.findall(r"(?:A|Answer)[:=]([-+]?\d+)", cleaned, flags=re.IGNORECASE)
+    # If model outputs spaced digits (e.g., "1 0 0 0 0 0 0 0"), collapse and parse first.
+    spaced_nums = re.findall(r"(?:\d\s+){6,9}\d", cleaned)
+    if spaced_nums:
+        merged = re.sub(r"\s+", "", spaced_nums[-1])
+        if len(merged) in (7, 8):
+            try:
+                return int(merged)
+            except:
+                pass
+
+    # Prefer explicit answer labels.
+    labeled_anywhere = re.findall(r"(?:A|Answer)\s*[:=]\s*([-+]?\d+)", cleaned, flags=re.IGNORECASE)
     if labeled_anywhere:
         try:
             return int(labeled_anywhere[-1])
         except:
             pass
 
-    # Prefer 7-8 digit candidates (expected range for 7-digit addition results).
-    long_nums = re.findall(r"\d{7,8}", cleaned)
-    if long_nums:
+    # Prefer 7-8 digit candidates, excluding known prompt sample values.
+    sample_nums = {
+        "1034169", "4154323", "5188482",
+        "1357924", "2468135", "3826059",
+        "1234567", "2469134",
+        "9875543", "1093285", "10968828",
+        "4398254", "2309481", "4629102"
+    }
+    long_nums = re.findall(r"\d{7,8}", re.sub(r"\s+", "", cleaned))
+    filtered = [v for v in long_nums if v not in sample_nums]
+    if filtered:
         try:
-            return int(long_nums[-1])
+            return int(filtered[-1])
         except:
             pass
 
     # Final fallback: any numeric token.
-    all_any = re.findall(r"\d+", cleaned)
+    all_any = re.findall(r"\d+", re.sub(r"\s+", "", cleaned))
     if all_any:
         try:
             return int(all_any[-1])
