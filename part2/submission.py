@@ -24,16 +24,16 @@ def your_prompt():
     Example: a=1111, b=2222, prefix='Input: ', suffix='\nOutput: '
     """
     prefix = (
-        "Sample Query 1: Compute 1043271 + 4185902.\n"
-        "Answer: 5229173\n"
-        "Sample Query 2: Compute 1374620 + 2490187.\n"
-        "Answer: 3864807\n"
-        "Sample Query 3: Compute 1240000 + 1250000.\n"
-        "Answer: 2490000\n"
-        "Sample Query 4: Compute 9900000 + 1100000.\n"
-        "Answer: 11000000\n"
-        "Sample Query 5: Compute 4500000 + 2400000.\n"
-        "Answer: 6900000\n"
+        "Sample Question 1: What is 1034169 + 4154323?\n"
+        "Answer: 5188482\n"
+        "Sample Question 2: What is 1357924 + 2468135?\n"
+        "Answer: 3826059\n"
+        "Sample Question 3: What is 1234567 + 1234567?\n"
+        "Answer: 2469134\n"
+        "Sample Question 4: What is 9875543 + 1093285?\n"
+        "Answer: 10968828\n"
+        "Sample Question 5: What is 4398254 + 2309481?\n"
+        "Answer: 4629102\n"
         "Question: What is "
     )
     suffix = "? Answer:"
@@ -81,7 +81,7 @@ def your_post_processing(output_string):
     # If model outputs spaced digits (e.g., "1 0 0 0 0 0 0 0"), collapse and parse first.
     spaced_nums = re.findall(r"(?:\d\s+){6,9}\d", cleaned)
     if spaced_nums:
-        merged = re.sub(r"\s+", "", spaced_nums[-1])
+        merged = re.sub(r"\s+", "", spaced_nums[0])
         if len(merged) in (7, 8):
             try:
                 return int(merged)
@@ -92,7 +92,7 @@ def your_post_processing(output_string):
     labeled_anywhere = re.findall(r"(?:A|Answer)\s*[:=]\s*([-+]?\d+)", cleaned, flags=re.IGNORECASE)
     if labeled_anywhere:
         try:
-            return int(labeled_anywhere[-1])
+            return int(labeled_anywhere[0])
         except:
             pass
 
@@ -108,7 +108,7 @@ def your_post_processing(output_string):
     filtered = [v for v in long_nums if v not in sample_nums]
     if filtered:
         try:
-            return int(filtered[-1])
+            return int(filtered[0])
         except:
             pass
 
@@ -116,7 +116,7 @@ def your_post_processing(output_string):
     all_any = re.findall(r"\d+", re.sub(r"\s+", "", cleaned))
     if all_any:
         try:
-            return int(all_any[-1])
+            return int(all_any[0])
         except:
             pass
 
