@@ -86,6 +86,11 @@ def train(args, model, train_loader, dev_loader, optimizer, scheduler):
         os.makedirs('logs', exist_ok=True)
         debug_log_path = os.path.join('logs', f't5_{model_type}_{experiment_name}_train_debug.jsonl')
 
+    # Ensure parent directory exists even when a custom debug log path is provided.
+    debug_log_dir = os.path.dirname(debug_log_path)
+    if debug_log_dir:
+        os.makedirs(debug_log_dir, exist_ok=True)
+
     for epoch in range(args.max_n_epochs):
         tr_loss = train_epoch(args, model, train_loader, optimizer, scheduler)
         print(f"Epoch {epoch}: Average train loss was {tr_loss}")
