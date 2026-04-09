@@ -199,10 +199,9 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=96,
+                max_new_tokens=256,
                 num_beams=4,
                 do_sample=False,
-                no_repeat_ngram_size=0,
                 repetition_penalty=1.0,
                 length_penalty=1.0,
                 early_stopping=True,
@@ -271,10 +270,9 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=96,
+                max_new_tokens=256,
                 num_beams=4,
                 do_sample=False,
-                no_repeat_ngram_size=0,
                 repetition_penalty=1.0,
                 length_penalty=1.0,
                 early_stopping=True,

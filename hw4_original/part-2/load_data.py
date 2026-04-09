@@ -46,8 +46,8 @@ class T5Dataset(Dataset):
         examples = []
 
         for i, nl in enumerate(nl_lines):
-            # Use an explicit task prefix to anchor generation toward SQL.
-            prompted_nl = f'translate English to SQL: {nl}'
+            # Make task intent explicit and end with an SQL cue for decoder behavior.
+            prompted_nl = f"Translate the question to SQL.\nQuestion: {nl}\nSQL:"
             enc = tokenizer(
                 prompted_nl,
                 add_special_tokens=True,
