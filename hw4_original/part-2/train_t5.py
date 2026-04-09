@@ -143,6 +143,8 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
 
     train_nl = load_lines(os.path.join('data', 'train.nl'))
     train_sql = load_lines(os.path.join('data', 'train.sql'))
+    train_token_sets = [set(x.lower().split()) for x in train_nl]
+    exact_map = {q.strip().lower(): train_sql[i] for i, q in enumerate(train_nl)}
 
     def extract_question_text(text):
         lower = text.lower()
@@ -157,11 +159,14 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
         return text.strip()
 
     def best_retrieval_sql(question_text):
+        key = question_text.strip().lower()
+        if key in exact_map:
+            return exact_map[key]
+
         q_tokens = set(question_text.lower().split())
         best_idx = 0
         best_score = -1.0
-        for i, cand in enumerate(train_nl):
-            c_tokens = set(cand.lower().split())
+        for i, c_tokens in enumerate(train_token_sets):
             if len(q_tokens) == 0 and len(c_tokens) == 0:
                 score = 1.0
             else:
@@ -274,6 +279,8 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
 
     train_nl = load_lines(os.path.join('data', 'train.nl'))
     train_sql = load_lines(os.path.join('data', 'train.sql'))
+    train_token_sets = [set(x.lower().split()) for x in train_nl]
+    exact_map = {q.strip().lower(): train_sql[i] for i, q in enumerate(train_nl)}
 
     def extract_question_text(text):
         lower = text.lower()
@@ -288,11 +295,14 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
         return text.strip()
 
     def best_retrieval_sql(question_text):
+        key = question_text.strip().lower()
+        if key in exact_map:
+            return exact_map[key]
+
         q_tokens = set(question_text.lower().split())
         best_idx = 0
         best_score = -1.0
-        for i, cand in enumerate(train_nl):
-            c_tokens = set(cand.lower().split())
+        for i, c_tokens in enumerate(train_token_sets):
             if len(q_tokens) == 0 and len(c_tokens) == 0:
                 score = 1.0
             else:
