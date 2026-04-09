@@ -142,11 +142,31 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
     def clean_generated_sql(text):
         text = text.strip()
         text = text.replace("SQL -", "").replace("SQL:", "").replace("SQL-", "").strip()
+
+        # Keep only SQL-looking suffix if the model emitted prompt text first.
         upper_text = text.upper()
-        select_pos = upper_text.find("SELECT")
-        if select_pos != -1:
-            text = text[select_pos:].strip()
-        return " ".join(text.split())
+        candidate_positions = []
+        for kw in ("SELECT", "WITH"):
+            pos = upper_text.find(kw)
+            if pos != -1:
+                candidate_positions.append(pos)
+        if candidate_positions:
+            text = text[min(candidate_positions):].strip()
+
+        # Collapse repeated whitespace and repeated consecutive tokens.
+        toks = text.split()
+        deduped = []
+        prev = None
+        repeat = 0
+        for tok in toks:
+            if tok == prev:
+                repeat += 1
+            else:
+                prev = tok
+                repeat = 1
+            if repeat <= 2:
+                deduped.append(tok)
+        return " ".join(deduped)
 
     model.eval()
     total_loss = 0
@@ -179,8 +199,12 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=96,
+                max_new_tokens=64,
                 num_beams=4,
+                do_sample=False,
+                no_repeat_ngram_size=2,
+                repetition_penalty=1.15,
+                length_penalty=0.9,
                 early_stopping=True,
             )
             decoded = tok.batch_decode(generated, skip_special_tokens=True)
@@ -209,11 +233,29 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
     def clean_generated_sql(text):
         text = text.strip()
         text = text.replace("SQL -", "").replace("SQL:", "").replace("SQL-", "").strip()
+
         upper_text = text.upper()
-        select_pos = upper_text.find("SELECT")
-        if select_pos != -1:
-            text = text[select_pos:].strip()
-        return " ".join(text.split())
+        candidate_positions = []
+        for kw in ("SELECT", "WITH"):
+            pos = upper_text.find(kw)
+            if pos != -1:
+                candidate_positions.append(pos)
+        if candidate_positions:
+            text = text[min(candidate_positions):].strip()
+
+        toks = text.split()
+        deduped = []
+        prev = None
+        repeat = 0
+        for tok in toks:
+            if tok == prev:
+                repeat += 1
+            else:
+                prev = tok
+                repeat = 1
+            if repeat <= 2:
+                deduped.append(tok)
+        return " ".join(deduped)
 
     model.eval()
     generated_sql_queries = []
@@ -229,8 +271,12 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=96,
+                max_new_tokens=64,
                 num_beams=4,
+                do_sample=False,
+                no_repeat_ngram_size=2,
+                repetition_penalty=1.15,
+                length_penalty=0.9,
                 early_stopping=True,
             )
             decoded = tok.batch_decode(generated, skip_special_tokens=True)

@@ -46,7 +46,8 @@ class T5Dataset(Dataset):
         examples = []
 
         for i, nl in enumerate(nl_lines):
-            prompted_nl = f'semantic parse to SQL: {nl}'
+            # Keep input minimal to reduce prompt phrase leakage in generated SQL.
+            prompted_nl = nl
             enc = tokenizer(
                 prompted_nl,
                 add_special_tokens=True,
