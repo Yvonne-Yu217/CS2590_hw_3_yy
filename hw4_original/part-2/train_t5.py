@@ -306,6 +306,11 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
 
     eval_loss = total_loss / max(total_tokens, 1)
 
+    expected_dev = len(dev_loader.dataset)
+    if len(generated_sql_queries) != expected_dev:
+        print(f"[warn] Dev predictions count {len(generated_sql_queries)} != expected {expected_dev}; truncating.")
+        generated_sql_queries = generated_sql_queries[:expected_dev]
+
     os.makedirs(os.path.dirname(model_sql_path), exist_ok=True)
     os.makedirs(os.path.dirname(model_record_path), exist_ok=True)
     save_queries_and_records(generated_sql_queries, model_sql_path, model_record_path)
@@ -466,6 +471,11 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 else:
                     qtext = extract_question_text(src)
                     generated_sql_queries.append(best_retrieval_sql(qtext))
+
+    expected_test = len(test_loader.dataset)
+    if len(generated_sql_queries) != expected_test:
+        print(f"[warn] Test predictions count {len(generated_sql_queries)} != expected {expected_test}; truncating.")
+        generated_sql_queries = generated_sql_queries[:expected_test]
 
     os.makedirs(os.path.dirname(model_sql_path), exist_ok=True)
     os.makedirs(os.path.dirname(model_record_path), exist_ok=True)
