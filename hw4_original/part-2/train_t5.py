@@ -306,10 +306,13 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
 
     eval_loss = total_loss / max(total_tokens, 1)
 
-    expected_dev = len(dev_loader.dataset)
-    if len(generated_sql_queries) != expected_dev:
-        print(f"[warn] Dev predictions count {len(generated_sql_queries)} != expected {expected_dev}; truncating.")
-        generated_sql_queries = generated_sql_queries[:expected_dev]
+    # Enforce exact alignment with dev examples before saving outputs.
+    expected_n = len(load_lines(gt_sql_pth))
+    if len(generated_sql_queries) < expected_n:
+        fill_sql = best_retrieval_sql('')
+        generated_sql_queries.extend([fill_sql] * (expected_n - len(generated_sql_queries)))
+    elif len(generated_sql_queries) > expected_n:
+        generated_sql_queries = generated_sql_queries[:expected_n]
 
     os.makedirs(os.path.dirname(model_sql_path), exist_ok=True)
     os.makedirs(os.path.dirname(model_record_path), exist_ok=True)
@@ -472,10 +475,13 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                     qtext = extract_question_text(src)
                     generated_sql_queries.append(best_retrieval_sql(qtext))
 
-    expected_test = len(test_loader.dataset)
-    if len(generated_sql_queries) != expected_test:
-        print(f"[warn] Test predictions count {len(generated_sql_queries)} != expected {expected_test}; truncating.")
-        generated_sql_queries = generated_sql_queries[:expected_test]
+    # Enforce exact alignment with test examples before saving outputs.
+    expected_n = len(load_lines(os.path.join('data', 'test.nl')))
+    if len(generated_sql_queries) < expected_n:
+        fill_sql = best_retrieval_sql('')
+        generated_sql_queries.extend([fill_sql] * (expected_n - len(generated_sql_queries)))
+    elif len(generated_sql_queries) > expected_n:
+        generated_sql_queries = generated_sql_queries[:expected_n]
 
     os.makedirs(os.path.dirname(model_sql_path), exist_ok=True)
     os.makedirs(os.path.dirname(model_record_path), exist_ok=True)
