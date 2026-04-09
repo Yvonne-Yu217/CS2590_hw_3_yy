@@ -1,0 +1,16 @@
+Epoch 0: Dev loss: 2.3850109830395025, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 0: 99.79% of the generated outputs led to SQL errors
+Epoch 1: Dev loss: 0.9683797261742635, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 1: 100.00% of the generated outputs led to SQL errors
+Epoch 2: Dev loss: 0.5957554360938228, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 2: 100.00% of the generated outputs led to SQL errors
+Epoch 3: Dev loss: 0.4517165779170688, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 3: 100.00% of the generated outputs led to SQL errors
+Epoch 4: Dev loss: 0.36531698947769253, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 4: 100.00% of the generated outputs led to SQL errors
+Epoch 5: Dev loss: 0.3116447862466179, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 5: 100.00% of the generated outputs led to SQL errors
+Epoch 6: Dev loss: 0.2742259476049535, Record F1: 0.11802575048283262, Record EM: 0.11802575107296137, SQL EM: 0.0
+Epoch 6: 100.00% of the generated outputs led to SQL errors
+Dev set results: Loss: {dev_loss}, Record F1: {dev_record_f1}, Record EM: {dev_record_em}, SQL EM: {dev_sql_em}
+Dev set results: 99.79% of the generated outputs led to SQL errors
