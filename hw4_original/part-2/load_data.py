@@ -46,7 +46,7 @@ class T5Dataset(Dataset):
         examples = []
 
         for i, nl in enumerate(nl_lines):
-            # T5 generally benefits from explicit task phrasing for seq2seq mapping.
+            # Use an explicit task prefix to anchor generation toward SQL.
             prompted_nl = f'translate English to SQL: {nl}'
             enc = tokenizer(
                 prompted_nl,

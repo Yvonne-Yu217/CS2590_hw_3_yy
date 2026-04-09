@@ -143,6 +143,7 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
         text = text.strip()
         text = text.replace("SQL -", "").replace("SQL:", "").replace("SQL-", "").strip()
 
+        # Keep only SQL-looking suffix if the model emitted prompt text first.
         upper_text = text.upper()
         candidate_positions = []
         for kw in ("SELECT", "WITH"):
@@ -152,7 +153,20 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
         if candidate_positions:
             text = text[min(candidate_positions):].strip()
 
-        return " ".join(text.split())
+        # Collapse repeated whitespace and repeated consecutive tokens.
+        toks = text.split()
+        deduped = []
+        prev = None
+        repeat = 0
+        for tok in toks:
+            if tok == prev:
+                repeat += 1
+            else:
+                prev = tok
+                repeat = 1
+            if repeat <= 2:
+                deduped.append(tok)
+        return " ".join(deduped)
 
     model.eval()
     total_loss = 0
@@ -185,9 +199,12 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=128,
+                max_new_tokens=96,
                 num_beams=4,
                 do_sample=False,
+                no_repeat_ngram_size=0,
+                repetition_penalty=1.0,
+                length_penalty=1.0,
                 early_stopping=True,
             )
             decoded = tok.batch_decode(generated, skip_special_tokens=True)
@@ -226,7 +243,19 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
         if candidate_positions:
             text = text[min(candidate_positions):].strip()
 
-        return " ".join(text.split())
+        toks = text.split()
+        deduped = []
+        prev = None
+        repeat = 0
+        for tok in toks:
+            if tok == prev:
+                repeat += 1
+            else:
+                prev = tok
+                repeat = 1
+            if repeat <= 2:
+                deduped.append(tok)
+        return " ".join(deduped)
 
     model.eval()
     generated_sql_queries = []
@@ -242,9 +271,12 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=128,
+                max_new_tokens=96,
                 num_beams=4,
                 do_sample=False,
+                no_repeat_ngram_size=0,
+                repetition_penalty=1.0,
+                length_penalty=1.0,
                 early_stopping=True,
             )
             decoded = tok.batch_decode(generated, skip_special_tokens=True)
@@ -274,15 +306,16 @@ def main():
     model.eval()
     
     # Dev set
+    experiment_name = args.experiment_name
     model_type = 'ft' if args.finetune else 'scr'
     gt_sql_path = os.path.join(f'data/dev.sql')
     gt_record_path = os.path.join(f'records/dev_gt_records.pkl')
     model_sql_path = os.path.join(f'results/t5_{model_type}_{args.experiment_name}_dev.sql')
     model_record_path = os.path.join(f'records/t5_{model_type}_{args.experiment_name}_dev.pkl')
-    dev_loss, dev_record_f1, dev_record_em, dev_sql_em, dev_error_rate = eval_epoch(args, model, dev_loader,
+    dev_loss, dev_record_em, dev_record_f1, dev_sql_em, dev_error_rate = eval_epoch(args, model, dev_loader,
                                                                                     gt_sql_path, model_sql_path,
                                                                                     gt_record_path, model_record_path)
-    print(f"Dev set results: Loss: {dev_loss}, Record F1: {dev_record_f1}, Record EM: {dev_record_em}, SQL EM: {dev_sql_em}")
+    print("Dev set results: Loss: {dev_loss}, Record F1: {dev_record_f1}, Record EM: {dev_record_em}, SQL EM: {dev_sql_em}")
     print(f"Dev set results: {dev_error_rate*100:.2f}% of the generated outputs led to SQL errors")
 
     # Test set
