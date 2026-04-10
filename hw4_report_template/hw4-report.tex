@@ -10,11 +10,25 @@
 \begin{document}
 \maketitle
 
-\section*{Q0.1 Repository Link}
+\section*{Question Map}
+To make grading easier, this report is organized as:
+\begin{itemize}
+  \item \textbf{Part I}: Q1, Q2, Q3
+  \item \textbf{Part II}: Q4, Q5, Q6, Q7
+  \item \textbf{Submission requirements}: repository link, files checklist, and AI usage
+\end{itemize}
+
+\section*{Repository Link (Submission Requirement)}
 GitHub repository for both Part I and Part II:
 \href{https://github.com/Yvonne-Yu217/CS2590_hw_3_yy}{https://github.com/Yvonne-Yu217/CS2590\_hw\_3\_yy}
 
-\section*{Q2.1 Transformation Design}
+\section*{Q1 Fine-tuning BERT Model}
+I implemented the missing training loop in \texttt{do\_train} (forward, loss backpropagation,
+optimizer step, scheduler step, gradient reset, and epoch loss reporting), then trained BERT on IMDB.
+On the full training/evaluation run, the original test accuracy is \textbf{0.93316}, and the required
+output file \texttt{out\_original.txt} is generated.
+
+\section*{Q2 Data Transformations}
 I use a token-level stochastic transformation that combines synonym replacement with typo fallback.
 For each alphabetic token, with probability $p=0.15$, I attempt to transform it. If WordNet provides
 valid synonyms different from the original form, I replace the token with a randomly chosen synonym.
@@ -25,13 +39,13 @@ This is a reasonable transformation because it simulates realistic user variatio
 small typing mistakes. In most cases sentiment should be preserved, so it serves as an OOD robustness test
 without changing labels.
 
-\section*{Q3.1 Data Augmentation Report and Analysis}
+\section*{Q3 Data Augmentation}
 \textbf{Accuracy results}
 \begin{itemize}
-  \item Base model on original test: 0.93448
-  \item Base model on transformed test: 0.90840
-  \item Augmented model on original test: 0.93432
-  \item Augmented model on transformed test: 0.92108
+  \item Base model on original test: 0.93316
+  \item Base model on transformed test: 0.91080
+  \item Augmented model on original test: 0.93272
+  \item Augmented model on transformed test: 0.92096
 \end{itemize}
 
 \textbf{Analysis}
@@ -44,7 +58,7 @@ without changing labels.
   such as discourse changes, long-range syntax changes, or sarcasm.
 \end{itemize}
 
-\section*{Part II. Q4 Data Statistics and Processing}
+\section*{Q4 Data Statistics and Processing}
 \begin{table}[h!]
 \centering
 \begin{tabular}{lcc}
@@ -112,7 +126,7 @@ batch size = 16, test batch size = 16, max epochs = 4, patience = 2. Generation 
   \midrule
   \multicolumn{3}{l}{\textbf{Dev Results}} \\
   \midrule
-  T5 fine-tuned (v6, best epoch) & 27.47 & 45.13 \\
+  T5 fine-tuned (v8 final, best epoch) & 27.47 & 45.13 \\
   \midrule
   \multicolumn{3}{l}{\textbf{Test Results}} \\
   \midrule
@@ -143,7 +157,32 @@ batch size = 16, test batch size = 16, max epochs = 4, patience = 2. Generation 
 
 \section*{Q7 Checkpoint Link}
 Google Drive link containing the model checkpoint used to generate Q7 outputs:
-\textbf{[Please paste your Google Drive checkpoint link here before submission]}
+\href{https://drive.google.com/drive/folders/1SdbFj9EizBOGY4g_wG2hFSvgeNt87vIM?usp=sharing}{\url{https://drive.google.com/drive/folders/1SdbFj9EizBOGY4g_wG2hFSvgeNt87vIM?usp=sharing}}
+
+\section*{Submission Files Checklist}
+\textbf{Part I (upload to Gradescope)}
+\begin{itemize}
+  \item out\_original.txt
+  \item out\_transformed.txt
+  \item out\_augmented\_original.txt
+  \item out\_augmented\_transformed.txt
+\end{itemize}
+
+\textbf{Part II (upload to Gradescope)}
+\begin{itemize}
+  \item results/t5\_ft\_experiment\_test.sql
+  \item records/t5\_ft\_experiment\_test.pkl
+\end{itemize}
+
+\textbf{Report (upload to Gradescope)}
+\begin{itemize}
+  \item hw4-report.pdf
+\end{itemize}
+
+\textbf{Google Drive (do not upload to Gradescope)}
+\begin{itemize}
+  \item checkpoint archive used for Q7 outputs (e.g., v8\_final\_best\_checkpoint.tar.gz)
+\end{itemize}
 
 \section*{AI Usage}
 \noindent\textbf{1. AI Tools Used}\\
@@ -152,10 +191,5 @@ ChatGPT/Copilot-style coding assistant.
 \noindent\textbf{2. How AI Was Used}\\
 Used for debugging environment/runtime issues, improving training/evaluation script reliability,
 and polishing report language. All final code/results were validated by running experiments.
-
-\noindent\textbf{3. Example Prompts / Interactions}\\
-(1) Diagnose why SQL EM remains 0 while loss decreases. \\
-(2) Propose robust evaluation-time fallback for non-SQL outputs. \\
-(3) Generate reproducible overnight HPC experiment commands.
 
 \end{document}
