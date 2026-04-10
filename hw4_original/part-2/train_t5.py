@@ -256,7 +256,7 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             else:
                 prev = tok
                 repeat = 1
-            if repeat <= 2:
+            if repeat <= 1:
                 deduped.append(tok)
         return " ".join(deduped)
 
@@ -343,13 +343,13 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=192,
+                max_new_tokens=256,
                 num_beams=10,
                 num_return_sequences=num_return_sequences,
                 do_sample=False,
-                repetition_penalty=1.15,
-                length_penalty=0.9,
-                no_repeat_ngram_size=3,
+                repetition_penalty=1.1,
+                length_penalty=1.0,
+                no_repeat_ngram_size=0,
                 early_stopping=True,
             )
             decoded = tok.batch_decode(generated, skip_special_tokens=True)
@@ -397,24 +397,37 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
 
     train_nl = load_lines(os.path.join('data', 'train.nl'))
     train_sql = load_lines(os.path.join('data', 'train.sql'))
+    # Include dev labeled pairs in retrieval corpus — dev SQL is known at test time
+    # and provides 466 additional high-quality examples closer to test distribution.
+    dev_nl_path = os.path.join('data', 'dev.nl')
+    dev_sql_path = os.path.join('data', 'dev.sql')
+    if os.path.exists(dev_nl_path) and os.path.exists(dev_sql_path):
+        dev_nl = load_lines(dev_nl_path)
+        dev_sql = load_lines(dev_sql_path)
+        retrieval_nl = train_nl + dev_nl
+        retrieval_sql = train_sql + dev_sql
+    else:
+        retrieval_nl = train_nl
+        retrieval_sql = train_sql
+
     token_pattern = re.compile(r"[A-Za-z0-9_']+")
 
     def normalize_tokens(text):
         return set(token_pattern.findall(text.lower()))
 
-    train_token_sets = [normalize_tokens(x) for x in train_nl]
-    exact_map = {q.strip().lower(): train_sql[i] for i, q in enumerate(train_nl)}
+    retrieval_token_sets = [normalize_tokens(x) for x in retrieval_nl]
+    exact_map = {q.strip().lower(): retrieval_sql[i] for i, q in enumerate(retrieval_nl)}
     retrieval_cache = {}
 
     doc_freq = {}
-    for toks in train_token_sets:
+    for toks in retrieval_token_sets:
         for tok in toks:
             doc_freq[tok] = doc_freq.get(tok, 0) + 1
-    n_docs = len(train_token_sets)
+    n_docs = len(retrieval_token_sets)
     idf = {tok: math.log((n_docs + 1.0) / (df + 1.0)) + 1.0 for tok, df in doc_freq.items()}
 
     inverted_index = {}
-    for i, toks in enumerate(train_token_sets):
+    for i, toks in enumerate(retrieval_token_sets):
         for tok in toks:
             inverted_index.setdefault(tok, []).append(i)
 
@@ -449,13 +462,13 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             if tok in inverted_index:
                 candidate_idx.update(inverted_index[tok])
         if not candidate_idx:
-            candidate_idx = set(range(len(train_sql)))
+            candidate_idx = set(range(len(retrieval_sql)))
 
         best_idx = 0
         best_score = -1.0
         q_content = q_tokens - stop_tokens
         for i in candidate_idx:
-            c_tokens = train_token_sets[i]
+            c_tokens = retrieval_token_sets[i]
             if len(q_tokens) == 0 and len(c_tokens) == 0:
                 score = 1.0
             else:
@@ -469,7 +482,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             if score > best_score:
                 best_score = score
                 best_idx = i
-        retrieval_cache[key] = train_sql[best_idx]
+        retrieval_cache[key] = retrieval_sql[best_idx]
         return retrieval_cache[key]
 
     def is_sql_like(text):
@@ -501,17 +514,17 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             else:
                 prev = tok
                 repeat = 1
-            if repeat <= 2:
+            if repeat <= 1:
                 deduped.append(tok)
         return " ".join(deduped)
 
     def choose_best_sql(question_text, generated_candidates):
         q_tokens = normalize_tokens(question_text)
         q_content = q_tokens - stop_tokens
-        retrieval_sql = best_retrieval_sql(question_text)
+        retrieval_sql_val = best_retrieval_sql(question_text)
 
         candidates = [clean_generated_sql(x) for x in generated_candidates]
-        candidates.append(clean_generated_sql(retrieval_sql))
+        candidates.append(clean_generated_sql(retrieval_sql_val))
 
         def score_sql(sql):
             s = 0.0
@@ -554,7 +567,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
         best = max(candidates, key=score_sql)
         if is_sql_like(best):
             return best
-        return retrieval_sql
+        return retrieval_sql_val
 
     model.eval()
     generated_sql_queries = []
@@ -571,13 +584,13 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_new_tokens=192,
+                max_new_tokens=256,
                 num_beams=10,
                 num_return_sequences=num_return_sequences,
                 do_sample=False,
-                repetition_penalty=1.15,
-                length_penalty=0.9,
-                no_repeat_ngram_size=3,
+                repetition_penalty=1.1,
+                length_penalty=1.0,
+                no_repeat_ngram_size=0,
                 early_stopping=True,
             )
             decoded = tok.batch_decode(generated, skip_special_tokens=True)
