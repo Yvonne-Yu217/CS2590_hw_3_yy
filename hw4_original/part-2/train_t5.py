@@ -216,6 +216,9 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
                 found.add(code)
         return found
 
+    # Precompute city sets for city-aware retrieval.
+    train_city_sets = [set(extract_cities(x)) for x in train_nl]
+
     def extract_question_text(text):
         lower = text.lower()
         q_key = 'question:'
@@ -237,6 +240,7 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             return retrieval_cache[key]
 
         q_tokens = normalize_tokens(question_text)
+        q_cities_set = set(extract_cities(question_text))
         candidate_idx = set()
         for tok in q_tokens:
             if tok in inverted_index:
@@ -259,18 +263,24 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
                 content_overlap = len(q_content & (c_tokens - stop_tokens))
                 score = (w_inter / w_union) if w_union > 0 else 0.0
                 score += 0.12 * content_overlap
+            # City-aware retrieval: heavily favour same-city examples.
+            c_cities = train_city_sets[i]
+            score += 0.8 * len(q_cities_set & c_cities)
+            score -= 0.5 * len(q_cities_set - c_cities)
+            score -= 0.3 * len(c_cities - q_cities_set)
             if score > best_score:
                 best_score = score
                 best_idx = i
         retrieval_cache[key] = train_sql[best_idx]
         return retrieval_cache[key]
 
-    def best_retrieval_topk(question_text, k=3):
+    def best_retrieval_topk(question_text, k=5):
         key = question_text.strip().lower()
         if key in exact_map:
             return [exact_map[key]]
 
         q_tokens = normalize_tokens(question_text)
+        q_cities_set = set(extract_cities(question_text))
         candidate_idx = set()
         for tok in q_tokens:
             if tok in inverted_index:
@@ -292,6 +302,11 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
                 content_overlap = len(q_content & (c_tokens - stop_tokens))
                 score = (w_inter / w_union) if w_union > 0 else 0.0
                 score += 0.12 * content_overlap
+            # City-aware retrieval: heavily favour same-city examples.
+            c_cities = train_city_sets[i]
+            score += 0.8 * len(q_cities_set & c_cities)
+            score -= 0.5 * len(q_cities_set - c_cities)
+            score -= 0.3 * len(c_cities - q_cities_set)
             scored.append((score, i))
         scored.sort(key=lambda x: -x[0])
         seen = set()
@@ -359,7 +374,7 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
         # Gather model candidates.
         candidates = [(clean_generated_sql(x, is_retrieval=False), False) for x in generated_candidates]
         # Add top-k retrieval candidates (tagged as retrieval).
-        for rsql in best_retrieval_topk(question_text, k=3):
+        for rsql in best_retrieval_topk(question_text, k=5):
             candidates.append((clean_generated_sql(rsql, is_retrieval=True), True))
 
         def score_sql(pair):
@@ -409,6 +424,13 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
                 s -= 2.0
             if upper.count('SELECT') > 2:
                 s -= 0.5 * (upper.count('SELECT') - 2)
+
+            # Complexity penalty — very long SQL is more likely to timeout.
+            n_tokens = len(sql.split())
+            if n_tokens > 120:
+                s -= 1.0
+            if n_tokens > 180:
+                s -= 1.5
 
             # Token overlap.
             sql_tokens = normalize_tokens(sql)
@@ -464,7 +486,7 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             total_loss += loss.item() * num_tokens
             total_tokens += num_tokens
 
-            num_return_sequences = 6
+            num_return_sequences = 10
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
@@ -601,6 +623,9 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 found.add(code)
         return found
 
+    # Precompute city sets for city-aware retrieval.
+    retrieval_city_sets = [set(extract_cities(x)) for x in retrieval_nl]
+
     def extract_question_text(text):
         lower = text.lower()
         q_key = 'question:'
@@ -622,6 +647,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             return retrieval_cache[key]
 
         q_tokens = normalize_tokens(question_text)
+        q_cities_set = set(extract_cities(question_text))
         candidate_idx = set()
         for tok in q_tokens:
             if tok in inverted_index:
@@ -644,18 +670,24 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 content_overlap = len(q_content & (c_tokens - stop_tokens))
                 score = (w_inter / w_union) if w_union > 0 else 0.0
                 score += 0.12 * content_overlap
+            # City-aware retrieval: heavily favour same-city examples.
+            c_cities = retrieval_city_sets[i]
+            score += 0.8 * len(q_cities_set & c_cities)
+            score -= 0.5 * len(q_cities_set - c_cities)
+            score -= 0.3 * len(c_cities - q_cities_set)
             if score > best_score:
                 best_score = score
                 best_idx = i
         retrieval_cache[key] = retrieval_sql[best_idx]
         return retrieval_cache[key]
 
-    def best_retrieval_topk(question_text, k=3):
+    def best_retrieval_topk(question_text, k=5):
         key = question_text.strip().lower()
         if key in exact_map:
             return [exact_map[key]]
 
         q_tokens = normalize_tokens(question_text)
+        q_cities_set = set(extract_cities(question_text))
         candidate_idx = set()
         for tok in q_tokens:
             if tok in inverted_index:
@@ -677,6 +709,11 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 content_overlap = len(q_content & (c_tokens - stop_tokens))
                 score = (w_inter / w_union) if w_union > 0 else 0.0
                 score += 0.12 * content_overlap
+            # City-aware retrieval: heavily favour same-city examples.
+            c_cities = retrieval_city_sets[i]
+            score += 0.8 * len(q_cities_set & c_cities)
+            score -= 0.5 * len(q_cities_set - c_cities)
+            score -= 0.3 * len(c_cities - q_cities_set)
             scored.append((score, i))
         scored.sort(key=lambda x: -x[0])
         seen = set()
@@ -742,7 +779,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
         # Gather model candidates.
         candidates = [(clean_generated_sql(x, is_retrieval=False), False) for x in generated_candidates]
         # Add top-k retrieval candidates (tagged as retrieval).
-        for rsql in best_retrieval_topk(question_text, k=3):
+        for rsql in best_retrieval_topk(question_text, k=5):
             candidates.append((clean_generated_sql(rsql, is_retrieval=True), True))
 
         def score_sql(pair):
@@ -793,6 +830,13 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             if upper.count('SELECT') > 2:
                 s -= 0.5 * (upper.count('SELECT') - 2)
 
+            # Complexity penalty — very long SQL is more likely to timeout.
+            n_tokens = len(sql.split())
+            if n_tokens > 120:
+                s -= 1.0
+            if n_tokens > 180:
+                s -= 1.5
+
             # Token overlap.
             sql_tokens = normalize_tokens(sql)
             s += 0.25 * len(q_content & sql_tokens)
@@ -830,7 +874,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             encoder_input = encoder_input.to(DEVICE)
             encoder_mask = encoder_mask.to(DEVICE)
 
-            num_return_sequences = 6
+            num_return_sequences = 10
             generated = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
