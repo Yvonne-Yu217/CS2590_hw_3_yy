@@ -1,1 +1,0 @@
-This is the directory where you will save your results (SQL files)
