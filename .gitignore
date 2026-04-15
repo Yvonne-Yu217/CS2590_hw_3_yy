@@ -11,3 +11,6 @@ part2/results/
 out/
 *.log
 v8_final_best_checkpoint.tar.gz
+claude-code.tgz
+*.bak
+**/checkpoints/

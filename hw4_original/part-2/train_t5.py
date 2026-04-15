@@ -53,8 +53,27 @@ def get_args():
     args = parser.parse_args()
     return args
 
+def eval_loss_only(args, model, dev_loader):
+    """Fast dev-loss evaluation without beam search — keeps GPU busy."""
+    model.eval()
+    total_loss = 0
+    total_tokens = 0
+    with torch.no_grad():
+        for encoder_input, encoder_mask, _, decoder_targets, _ in dev_loader:
+            encoder_input = encoder_input.to(DEVICE)
+            encoder_mask = encoder_mask.to(DEVICE)
+            decoder_targets = decoder_targets.to(DEVICE)
+            labels = decoder_targets.clone()
+            labels[labels == PAD_IDX] = -100
+            outputs = model(input_ids=encoder_input, attention_mask=encoder_mask, labels=labels)
+            non_pad = decoder_targets != PAD_IDX
+            num_tokens = torch.sum(non_pad).item()
+            total_loss += outputs.loss.item() * num_tokens
+            total_tokens += num_tokens
+    return total_loss / max(total_tokens, 1)
+
 def train(args, model, train_loader, dev_loader, optimizer, scheduler):
-    best_f1 = -1
+    best_loss = float('inf')
     epochs_since_improvement = 0
 
     model_type = 'ft' if args.finetune else 'scr'
@@ -67,25 +86,19 @@ def train(args, model, train_loader, dev_loader, optimizer, scheduler):
         tr_loss = train_epoch(args, model, train_loader, optimizer, scheduler)
         print(f"Epoch {epoch}: Average train loss was {tr_loss}")
 
-        eval_loss, record_f1, record_em, sql_em, error_rate = eval_epoch(args, model, dev_loader,
-                                                                         gt_sql_path, model_sql_path,
-                                                                         gt_record_path, model_record_path)
-        print(f"Epoch {epoch}: Dev loss: {eval_loss}, Record F1: {record_f1}, Record EM: {record_em}, SQL EM: {sql_em}")
-        print(f"Epoch {epoch}: {error_rate*100:.2f}% of the generated outputs led to SQL errors")
+        # Fast loss-only eval for early stopping (keeps GPU busy, ~10s vs ~10min)
+        eval_loss = eval_loss_only(args, model, dev_loader)
+        print(f"Epoch {epoch}: Dev loss: {eval_loss}")
 
         if args.use_wandb:
             result_dict = {
                 'train/loss' : tr_loss,
                 'dev/loss' : eval_loss,
-                'dev/record_f1' : record_f1,
-                'dev/record_em' : record_em,
-                'dev/sql_em' : sql_em,
-                'dev/error_rate' : error_rate,
             }
             wandb.log(result_dict, step=epoch)
 
-        if record_f1 > best_f1:
-            best_f1 = record_f1
+        if eval_loss < best_loss:
+            best_loss = eval_loss
             epochs_since_improvement = 0
         else:
             epochs_since_improvement += 1
@@ -142,6 +155,24 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
     '''
     # TODO
     from load_data import load_lines
+    import sqlite3
+
+    DB_PATH = os.path.join('data', 'flight_database.db')
+
+    def execute_sql_quick(sql):
+        """Execute SQL against the flight DB; returns (records_list, error_string)."""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            recs = cursor.fetchall()
+            err = ""
+        except Exception as e:
+            recs = []
+            err = str(e)
+        finally:
+            conn.close()
+        return recs, err
 
     def count_non_empty_lines(path):
         with open(path, 'r') as f:
@@ -320,6 +351,13 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
                 break
         return results if results else [train_sql[0]]
 
+    # Cache for SQL execution results to avoid re-running the same query.
+    exec_cache = {}
+    def cached_execute(sql):
+        if sql not in exec_cache:
+            exec_cache[sql] = execute_sql_quick(sql)
+        return exec_cache[sql]
+
     def is_sql_like(text):
         upper = text.upper().strip()
         if not (upper.startswith('SELECT') or upper.startswith('WITH')):
@@ -483,6 +521,17 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             if len(q_tokens & cue_words) > 0 and ' WHERE ' in f' {upper} ':
                 s += 0.25
 
+            # EXECUTION-BASED VALIDATION — strongest signal.
+            recs, err = cached_execute(sql)
+            if err:
+                s -= 10.0   # SQL that doesn't execute is almost never correct
+            elif len(recs) > 0:
+                s += 3.0    # SQL that returns results is likely better
+                if len(recs) > 500:
+                    s -= 1.0  # Overly broad queries are suspicious
+            else:
+                s -= 0.5    # Empty results — might be wrong but not always
+
             return s
 
         best_sql, _ = max(candidates, key=score_sql)
@@ -565,10 +614,33 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
         
 def test_inference(args, model, test_loader, model_sql_path, model_record_path):
     '''
-    You must implement inference to compute your model's generated SQL queries and its associated 
+    You must implement inference to compute your model's generated SQL queries and its associated
     database records. Implementation should be very similar to eval_epoch.
     '''
     from load_data import load_lines
+    import sqlite3
+
+    DB_PATH = os.path.join('data', 'flight_database.db')
+
+    def execute_sql_quick(sql):
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            recs = cursor.fetchall()
+            err = ""
+        except Exception as e:
+            recs = []
+            err = str(e)
+        finally:
+            conn.close()
+        return recs, err
+
+    exec_cache = {}
+    def cached_execute(sql):
+        if sql not in exec_cache:
+            exec_cache[sql] = execute_sql_quick(sql)
+        return exec_cache[sql]
 
     def count_non_empty_lines(path):
         with open(path, 'r') as f:
@@ -919,6 +991,17 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             cue_words = {'from', 'to', 'between', 'after', 'before', 'on', 'in'}
             if len(q_tokens & cue_words) > 0 and ' WHERE ' in f' {upper} ':
                 s += 0.25
+
+            # EXECUTION-BASED VALIDATION — strongest signal.
+            recs, err = cached_execute(sql)
+            if err:
+                s -= 10.0
+            elif len(recs) > 0:
+                s += 3.0
+                if len(recs) > 500:
+                    s -= 1.0
+            else:
+                s -= 0.5
 
             return s
 

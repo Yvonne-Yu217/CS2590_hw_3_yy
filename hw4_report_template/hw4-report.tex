@@ -107,9 +107,9 @@ Decoder targets are ground-truth SQL sequences plus EOS token. \\
 Tokenization & Default \texttt{google-t5/t5-small} tokenizer for both encoder and decoder.
 Dynamic padding in collate functions. \\
 Architecture & Fine-tuned pretrained T5-small end-to-end (all parameters trainable). \\
-Hyperparameters & AdamW, learning rate $2\times10^{-5}$, linear scheduler, warmup epochs = 1,
-batch size = 16, test batch size = 16, max epochs = 4, patience = 2. Generation used beam search
-(num\_beams=4, max\_new\_tokens=256, deterministic decoding). \\
+Hyperparameters & AdamW, learning rate $3\times10^{-4}$, cosine scheduler, warmup epochs = 2,
+batch size = 16, test batch size = 16, max epochs = 30, patience = 5. Generation used beam search
+(num\_beams=4, max\_length=512, deterministic decoding). \\
 \bottomrule
 \end{tabular}
 \caption{Best-performing fine-tuned T5 configuration.}
@@ -126,7 +126,7 @@ batch size = 16, test batch size = 16, max epochs = 4, patience = 2. Generation 
   \midrule
   \multicolumn{3}{l}{\textbf{Dev Results}} \\
   \midrule
-  T5 fine-tuned (v8 final, best epoch) & 27.47 & 45.13 \\
+  T5 fine-tuned (best epoch 17) & 2.58 & 77.85 \\
   \midrule
   \multicolumn{3}{l}{\textbf{Test Results}} \\
   \midrule
@@ -144,11 +144,11 @@ batch size = 16, test batch size = 16, max epochs = 4, patience = 2. Generation 
     \toprule
     \textbf{Error Type} & \textbf{Example} & \textbf{Description} & \textbf{Statistics} \\
     \midrule
-    Syntax error & malformed SQL query & Parentheses, joins, or clause ordering errors causing execution failure. & 4/466 (best dev epoch) \\
+    Syntax error & malformed SQL query & Parentheses, joins, or clause ordering errors causing execution failure. & 71/466 (15.24\% error rate) \\
     \midrule
-    Wrong grounding & wrong city/airline/date values & Query is executable but entities/constants differ from the intent. & 289/466 (1-Record EM) \\
+    Wrong grounding & wrong city/airline/date values & Query is executable but entities/constants differ from the intent. & 116/466 (1-Record EM) \\
     \midrule
-    Structural mismatch & partial or over-constrained query & Correct table family but wrong aggregation/filter structure. & 338/466 (1-SQL EM) \\
+    Structural mismatch & partial or over-constrained query & Correct table family but wrong aggregation/filter structure. & 454/466 (1-SQL EM) \\
     \bottomrule
   \end{tabular}
   \caption{Representative error categories on the dev set.}
